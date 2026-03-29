@@ -33,16 +33,26 @@ namespace AsobiDemo
             _cam.orthographicSize = GameConfig.ArenaHeight / (2 * GameConfig.PixelsPerUnit) + 0.5f;
 
             var client = GameConfig.Client;
+            Debug.Log($"[Arena] Start - PlayerId: {_myId}, WS connected: {client.Realtime.IsConnected}");
             client.Realtime.OnMatchState += OnMatchState;
             client.Realtime.OnMatchEvent += OnMatchEvent;
         }
 
         void OnMatchState(string rawJson)
         {
-            // Parse the payload from the WS message
-            var state = JsonUtility.FromJson<ArenaState>(ExtractPayload(rawJson));
+            Debug.Log($"[Arena] OnMatchState received: {rawJson.Substring(0, System.Math.Min(200, rawJson.Length))}");
+            var payload = ExtractPayload(rawJson);
+            Debug.Log($"[Arena] Extracted payload: {payload.Substring(0, System.Math.Min(200, payload.Length))}");
+            var state = ArenaState.Parse(payload);
             if (state != null)
+            {
+                Debug.Log($"[Arena] Parsed state: {state.players?.Count ?? -1} players, {state.projectiles?.Count ?? -1} projectiles");
                 _latestState = state;
+            }
+            else
+            {
+                Debug.LogWarning("[Arena] Failed to parse state");
+            }
         }
 
         void OnMatchEvent(string eventName, string rawJson)
@@ -109,6 +119,7 @@ namespace AsobiDemo
                 {
                     var prefab = kv.Key == _myId ? localPlayerPrefab : playerPrefab;
                     go = Instantiate(prefab);
+                    go.SetActive(true);
                     go.name = $"Player_{kv.Key[..8]}";
                     _playerObjects[kv.Key] = go;
 
@@ -160,6 +171,7 @@ namespace AsobiDemo
                     if (!_projectileObjects.TryGetValue(proj.id, out var go))
                     {
                         go = Instantiate(projectilePrefab);
+                        go.SetActive(true);
                         _projectileObjects[proj.id] = go;
 
                         var sr = go.GetComponent<SpriteRenderer>();

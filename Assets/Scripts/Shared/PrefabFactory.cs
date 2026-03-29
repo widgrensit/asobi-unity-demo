@@ -65,7 +65,7 @@ namespace AsobiDemo
             sr.sprite = CreateCrosshairSprite();
             sr.color = Color.white;
             sr.sortingOrder = 100;
-            go.transform.localScale = Vector3.one * 0.3f;
+            go.transform.localScale = Vector3.one * 1f;
             go.AddComponent<Crosshair>();
             return go;
         }
