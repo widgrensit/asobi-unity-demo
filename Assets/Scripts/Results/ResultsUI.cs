@@ -21,7 +21,7 @@ namespace AsobiDemo
             var myId = GameConfig.Client.PlayerId;
             var isWinner = MatchResult.Winner == myId;
             titleText.text = isWinner ? "VICTORY!" : "DEFEAT";
-            titleText.color = isWinner ? Color.yellow : Color.red;
+            titleText.color = isWinner ? NavalTheme.Tertiary : NavalTheme.Error;
 
             var sb = new System.Text.StringBuilder();
             foreach (var s in MatchResult.Standings)

@@ -24,7 +24,7 @@ namespace AsobiDemo
             var panel = CreatePanel(canvasGo.transform);
 
             // Title
-            var title = CreateText(panel.transform, "ASOBI ARENA", 42, Color.white,
+            var title = CreateText(panel.transform, "ASOBI ARENA", 42, NavalTheme.Primary,
                 new Vector2(0, 0.5f), new Vector2(1, 0.5f), new Vector2(0, 120), new Vector2(0, 50));
 
             // Username
@@ -37,15 +37,15 @@ namespace AsobiDemo
             passwordField.contentType = TMP_InputField.ContentType.Password;
 
             // Login Button
-            var loginBtn = CreateButton(panel.transform, "LOGIN", Color.cyan,
+            var loginBtn = CreateButton(panel.transform, "LOGIN", NavalTheme.Primary,
                 new Vector2(-80, -100));
 
             // Register Button
-            var registerBtn = CreateButton(panel.transform, "REGISTER", Color.green,
+            var registerBtn = CreateButton(panel.transform, "REGISTER", NavalTheme.Tertiary,
                 new Vector2(80, -100));
 
             // Status
-            var statusText = CreateText(panel.transform, "", 18, Color.yellow,
+            var statusText = CreateText(panel.transform, "", 18, NavalTheme.Secondary,
                 new Vector2(0, 0.5f), new Vector2(1, 0.5f), new Vector2(0, -160), new Vector2(0, 30));
 
             // Wire up LoginUI
@@ -57,7 +57,7 @@ namespace AsobiDemo
             SetField(loginUI, "statusText", statusText);
 
             // Background camera
-            Camera.main.backgroundColor = new Color(0.1f, 0.1f, 0.15f);
+            Camera.main.backgroundColor = NavalTheme.Background;
         }
 
         GameObject CreatePanel(Transform parent)
@@ -71,7 +71,7 @@ namespace AsobiDemo
             rect.anchoredPosition = Vector2.zero;
 
             var img = go.AddComponent<Image>();
-            img.color = new Color(0.15f, 0.15f, 0.2f, 0.9f);
+            img.color = NavalTheme.PanelBg;
             return go;
         }
 
@@ -86,7 +86,7 @@ namespace AsobiDemo
             rect.anchoredPosition = pos;
 
             var img = go.AddComponent<Image>();
-            img.color = new Color(0.2f, 0.2f, 0.25f);
+            img.color = NavalTheme.InputBg;
 
             // Text area
             var textArea = new GameObject("Text Area");
