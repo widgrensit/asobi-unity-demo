@@ -17,8 +17,8 @@ namespace AsobiDemo
             lr.useWorldSpace = true;
             lr.loop = false;
             lr.material = new Material(Shader.Find("Sprites/Default"));
-            lr.startColor = Color.white;
-            lr.endColor = Color.white;
+            lr.startColor = NavalTheme.Secondary * 0.6f;
+            lr.endColor = NavalTheme.Secondary * 0.6f;
 
             lr.SetPositions(new Vector3[]
             {

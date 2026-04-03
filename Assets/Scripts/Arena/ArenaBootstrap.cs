@@ -3,39 +3,52 @@ using TMPro;
 
 namespace AsobiDemo
 {
-    /// <summary>
-    /// Drop this on an empty GameObject in the Arena scene.
-    /// It creates all required objects at runtime so you don't need prefabs.
-    /// </summary>
     public class ArenaBootstrap : MonoBehaviour
     {
         void Awake()
         {
-            // Create prefabs at runtime
-            var playerPrefab = PrefabFactory.CreatePlayerPrefab(Color.red);
+            var playerPrefab = PrefabFactory.CreateShipPrefab(false);
             playerPrefab.SetActive(false);
 
-            var localPlayerPrefab = PrefabFactory.CreatePlayerPrefab(Color.cyan);
+            var localPlayerPrefab = PrefabFactory.CreateShipPrefab(true);
             localPlayerPrefab.SetActive(false);
 
             var projectilePrefab = PrefabFactory.CreateProjectilePrefab();
             projectilePrefab.SetActive(false);
 
-            // Arena bounds
             var bounds = new GameObject("ArenaBounds");
             bounds.AddComponent<ArenaBounds>();
 
-            // Crosshair
             Instantiate(PrefabFactory.CreateCrosshairPrefab());
 
             // HUD Canvas
             var canvas = CreateHUDCanvas();
-            var timerText = CreateHUDText(canvas.transform, "Timer", new Vector2(0, 1), new Vector2(0, 1),
-                new Vector2(0, -10), "1:30");
-            var killsText = CreateHUDText(canvas.transform, "Kills", new Vector2(1, 1), new Vector2(1, 1),
-                new Vector2(-120, -10), "Kills: 0");
-            var hpText = CreateHUDText(canvas.transform, "HP", new Vector2(1, 1), new Vector2(1, 1),
-                new Vector2(-120, -40), "HP: 100");
+
+            // Left side: timer
+            var timerText = CreateHUDText(canvas.transform, "Timer",
+                new Vector2(0, 1), new Vector2(0, 1),
+                new Vector2(10, -10), "1:30", NavalTheme.Secondary, 28);
+
+            // Right side: kills + HP
+            var killsText = CreateHUDText(canvas.transform, "Kills",
+                new Vector2(1, 1), new Vector2(1, 1),
+                new Vector2(-130, -10), "Kills: 0", NavalTheme.Primary, 22);
+            var hpText = CreateHUDText(canvas.transform, "HP",
+                new Vector2(1, 1), new Vector2(1, 1),
+                new Vector2(-130, -35), "HP: 100", NavalTheme.Tertiary, 22);
+
+            // Top-right: round + modifier
+            var roundText = CreateHUDText(canvas.transform, "Round",
+                new Vector2(1, 1), new Vector2(1, 1),
+                new Vector2(-130, -65), "", NavalTheme.Secondary, 20);
+            var modifierText = CreateHUDText(canvas.transform, "Modifier",
+                new Vector2(1, 1), new Vector2(1, 1),
+                new Vector2(-130, -88), "", NavalTheme.Primary, 18);
+
+            // Bottom center: active boons
+            var boonsText = CreateHUDText(canvas.transform, "Boons",
+                new Vector2(0.5f, 0), new Vector2(0.5f, 0),
+                new Vector2(0, 10), "", NavalTheme.Tertiary, 18);
 
             // ArenaManager
             var manager = gameObject.AddComponent<ArenaManager>();
@@ -45,6 +58,9 @@ namespace AsobiDemo
             SetPrivateField(manager, "timerText", timerText);
             SetPrivateField(manager, "killsText", killsText);
             SetPrivateField(manager, "hpText", hpText);
+            SetPrivateField(manager, "roundText", roundText);
+            SetPrivateField(manager, "modifierText", modifierText);
+            SetPrivateField(manager, "boonsText", boonsText);
         }
 
         GameObject CreateHUDCanvas()
@@ -53,12 +69,14 @@ namespace AsobiDemo
             var canvas = canvasGo.AddComponent<Canvas>();
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
             canvas.sortingOrder = 100;
-            canvasGo.AddComponent<UnityEngine.UI.CanvasScaler>();
+            var scaler = canvasGo.AddComponent<UnityEngine.UI.CanvasScaler>();
+            scaler.uiScaleMode = UnityEngine.UI.CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            scaler.referenceResolution = new Vector2(1280, 720);
             return canvasGo;
         }
 
         TMP_Text CreateHUDText(Transform parent, string name, Vector2 anchorMin, Vector2 anchorMax,
-            Vector2 offset, string defaultText)
+            Vector2 offset, string defaultText, Color color, int fontSize)
         {
             var go = new GameObject(name);
             go.transform.SetParent(parent);
@@ -68,12 +86,12 @@ namespace AsobiDemo
             rect.anchorMax = anchorMax;
             rect.pivot = anchorMin;
             rect.anchoredPosition = offset;
-            rect.sizeDelta = new Vector2(200, 30);
+            rect.sizeDelta = new Vector2(250, 30);
 
             var text = go.AddComponent<TextMeshProUGUI>();
             text.text = defaultText;
-            text.fontSize = 24;
-            text.color = Color.white;
+            text.fontSize = fontSize;
+            text.color = color;
             return text;
         }
 

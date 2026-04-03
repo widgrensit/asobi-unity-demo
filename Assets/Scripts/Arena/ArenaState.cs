@@ -11,22 +11,35 @@ namespace AsobiDemo
         public Dictionary<string, ArenaPlayer> players;
         public List<ArenaProjectile> projectiles;
         public float time_remaining;
+        public string phase;
+        public int round;
+        public string modifier;
+        public List<BoonOffer> boon_offers;
+        public int picks_done;
+        public List<string> my_boons;
+        public List<StandingEntry> standings;
 
         public static ArenaState Parse(string json)
         {
             var state = new ArenaState
             {
                 players = new Dictionary<string, ArenaPlayer>(),
-                projectiles = new List<ArenaProjectile>()
+                projectiles = new List<ArenaProjectile>(),
+                boon_offers = new List<BoonOffer>(),
+                my_boons = new List<string>(),
+                standings = new List<StandingEntry>()
             };
 
             state.time_remaining = ParseFloat(json, "time_remaining");
+            state.phase = ParseString(json, "phase");
+            state.round = ParseInt(json, "round");
+            state.modifier = ParseString(json, "modifier");
+            state.picks_done = ParseInt(json, "picks_done");
 
-            // Parse players object: "players":{...}
+            // Parse players
             var playersBlock = ExtractBlock(json, "players");
             if (playersBlock != null)
             {
-                // Each player: "id":{...}
                 int pos = 0;
                 while (pos < playersBlock.Length)
                 {
@@ -48,14 +61,15 @@ namespace AsobiDemo
                         y = ParseFloat(playerJson, "y"),
                         hp = ParseInt(playerJson, "hp"),
                         kills = ParseInt(playerJson, "kills"),
-                        deaths = ParseInt(playerJson, "deaths")
+                        deaths = ParseInt(playerJson, "deaths"),
+                        name = ParseString(playerJson, "name")
                     };
                     state.players[playerId] = player;
                     pos = braceEnd + 1;
                 }
             }
 
-            // Parse projectiles array: "projectiles":[...]
+            // Parse projectiles
             var projBlock = ExtractArray(json, "projectiles");
             if (projBlock != null)
             {
@@ -76,6 +90,62 @@ namespace AsobiDemo
                         owner = ParseString(projJson, "owner")
                     };
                     state.projectiles.Add(proj);
+                    pos = braceEnd + 1;
+                }
+            }
+
+            // Parse boon_offers
+            var boonBlock = ExtractArray(json, "boon_offers");
+            if (boonBlock != null)
+            {
+                int pos = 0;
+                while (pos < boonBlock.Length)
+                {
+                    var braceStart = boonBlock.IndexOf('{', pos);
+                    if (braceStart < 0) break;
+                    var braceEnd = FindMatchingBrace(boonBlock, braceStart);
+                    if (braceEnd < 0) break;
+
+                    var boonJson = boonBlock.Substring(braceStart, braceEnd - braceStart + 1);
+                    state.boon_offers.Add(new BoonOffer
+                    {
+                        id = ParseString(boonJson, "id"),
+                        name = ParseString(boonJson, "name"),
+                        description = ParseString(boonJson, "description")
+                    });
+                    pos = braceEnd + 1;
+                }
+            }
+
+            // Parse my_boons (string array)
+            var myBoonsBlock = ExtractArray(json, "my_boons");
+            if (myBoonsBlock != null)
+            {
+                var matches = Regex.Matches(myBoonsBlock, "\"([^\"]+)\"");
+                foreach (Match m in matches)
+                    state.my_boons.Add(m.Groups[1].Value);
+            }
+
+            // Parse standings
+            var standingsBlock = ExtractArray(json, "standings");
+            if (standingsBlock != null)
+            {
+                int pos = 0;
+                while (pos < standingsBlock.Length)
+                {
+                    var braceStart = standingsBlock.IndexOf('{', pos);
+                    if (braceStart < 0) break;
+                    var braceEnd = FindMatchingBrace(standingsBlock, braceStart);
+                    if (braceEnd < 0) break;
+
+                    var sJson = standingsBlock.Substring(braceStart, braceEnd - braceStart + 1);
+                    state.standings.Add(new StandingEntry
+                    {
+                        player_id = ParseString(sJson, "player_id"),
+                        kills = ParseInt(sJson, "kills"),
+                        deaths = ParseInt(sJson, "deaths"),
+                        rank = ParseInt(sJson, "rank")
+                    });
                     pos = braceEnd + 1;
                 }
             }
@@ -145,7 +215,7 @@ namespace AsobiDemo
             return 0;
         }
 
-        static string ParseString(string json, string key)
+        public static string ParseString(string json, string key)
         {
             var match = Regex.Match(json, "\"" + key + "\"\\s*:\\s*\"([^\"]+)\"");
             return match.Success ? match.Groups[1].Value : "";
@@ -160,6 +230,7 @@ namespace AsobiDemo
         public int hp;
         public int kills;
         public int deaths;
+        public string name;
     }
 
     [Serializable]
@@ -189,5 +260,36 @@ namespace AsobiDemo
         public bool shoot;
         public float aim_x;
         public float aim_y;
+    }
+
+    [Serializable]
+    public class BoonOffer
+    {
+        public string id;
+        public string name;
+        public string description;
+    }
+
+    [Serializable]
+    public class VoteOption
+    {
+        public string id;
+        public string label;
+    }
+
+    [Serializable]
+    public class VoteTally
+    {
+        public string option_id;
+        public int count;
+    }
+
+    [Serializable]
+    public class StandingEntry
+    {
+        public string player_id;
+        public int kills;
+        public int deaths;
+        public int rank;
     }
 }

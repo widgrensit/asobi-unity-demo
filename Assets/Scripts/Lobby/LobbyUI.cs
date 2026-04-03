@@ -76,12 +76,10 @@ namespace AsobiDemo
 
         void OnMatched(string rawJson)
         {
-            // Matched! The match server auto-joins us.
-            // Transition to arena scene on main thread
             _searching = false;
             UnityMainThread.Enqueue(() =>
             {
-                statusText.text = "Match found!";
+                statusText.text = "Match found! Get ready...";
                 SceneLoader.LoadArena();
             });
         }

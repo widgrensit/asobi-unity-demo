@@ -20,19 +20,19 @@ namespace AsobiDemo
             canvasGo.AddComponent<GraphicRaycaster>();
 
             // Player info
-            var playerText = CreateText(canvasGo.transform, "Player: ...", 18, Color.grey,
+            var playerText = CreateText(canvasGo.transform, "Player: ...", 18, NavalTheme.TextDim,
                 new Vector2(0, 180));
 
             // Status
-            var statusText = CreateText(canvasGo.transform, "Connecting...", 24, Color.white,
+            var statusText = CreateText(canvasGo.transform, "Connecting...", 24, NavalTheme.Secondary,
                 new Vector2(0, 40));
 
             // Find Match button
-            var findBtn = CreateButton(canvasGo.transform, "FIND MATCH", Color.cyan,
+            var findBtn = CreateButton(canvasGo.transform, "FIND MATCH", NavalTheme.Primary,
                 new Vector2(0, -40), new Vector2(250, 60));
 
             // Cancel button
-            var cancelBtn = CreateButton(canvasGo.transform, "CANCEL", Color.red,
+            var cancelBtn = CreateButton(canvasGo.transform, "CANCEL", NavalTheme.Error,
                 new Vector2(0, -40), new Vector2(250, 60));
 
             // Wire up
@@ -42,7 +42,7 @@ namespace AsobiDemo
             SetField(lobbyUI, "statusText", statusText);
             SetField(lobbyUI, "playerInfoText", playerText);
 
-            Camera.main.backgroundColor = new Color(0.1f, 0.1f, 0.15f);
+            Camera.main.backgroundColor = NavalTheme.Background;
         }
 
         Button CreateButton(Transform parent, string label, Color color, Vector2 pos, Vector2 size)

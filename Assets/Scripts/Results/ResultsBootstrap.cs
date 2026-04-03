@@ -4,9 +4,6 @@ using TMPro;
 
 namespace AsobiDemo
 {
-    /// <summary>
-    /// Drop on an empty GameObject in the Results scene. Creates the results UI at runtime.
-    /// </summary>
     public class ResultsBootstrap : MonoBehaviour
     {
         void Awake()
@@ -19,27 +16,21 @@ namespace AsobiDemo
             scaler.referenceResolution = new Vector2(1280, 720);
             canvasGo.AddComponent<GraphicRaycaster>();
 
-            // Title
-            var titleText = CreateText(canvasGo.transform, "RESULTS", 48, Color.white,
+            var titleText = CreateText(canvasGo.transform, "RESULTS", 48, NavalTheme.Primary,
                 new Vector2(0, 250));
 
-            // Standings
-            var standingsText = CreateText(canvasGo.transform, "", 20, Color.white,
+            var standingsText = CreateText(canvasGo.transform, "", 20, NavalTheme.Secondary,
                 new Vector2(0, 80), new Vector2(500, 200));
 
-            // Leaderboard
-            var lbText = CreateText(canvasGo.transform, "Loading...", 18, Color.grey,
+            var lbText = CreateText(canvasGo.transform, "Loading...", 18, NavalTheme.TextDim,
                 new Vector2(0, -120), new Vector2(400, 200));
 
-            // Play Again
-            var playBtn = CreateButton(canvasGo.transform, "PLAY AGAIN", Color.cyan,
+            var playBtn = CreateButton(canvasGo.transform, "PLAY AGAIN", NavalTheme.Primary,
                 new Vector2(-100, -280));
 
-            // Quit
-            var quitBtn = CreateButton(canvasGo.transform, "QUIT", Color.red,
+            var quitBtn = CreateButton(canvasGo.transform, "QUIT", NavalTheme.Error,
                 new Vector2(100, -280));
 
-            // Wire up
             var ui = gameObject.AddComponent<ResultsUI>();
             SetField(ui, "titleText", titleText);
             SetField(ui, "standingsText", standingsText);
@@ -47,7 +38,7 @@ namespace AsobiDemo
             SetField(ui, "playAgainButton", playBtn);
             SetField(ui, "quitButton", quitBtn);
 
-            Camera.main.backgroundColor = new Color(0.1f, 0.1f, 0.15f);
+            Camera.main.backgroundColor = NavalTheme.Background;
         }
 
         Button CreateButton(Transform parent, string label, Color color, Vector2 pos)
