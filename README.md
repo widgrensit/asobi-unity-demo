@@ -7,28 +7,18 @@ Players match up, spawn into an arena, move with WASD, aim with mouse, and shoot
 ## Prerequisites
 
 - Unity 2021.3+ (LTS recommended)
-- Asobi backend running locally (`rebar3 shell`)
-- PostgreSQL (via `docker compose up -d` in the asobi project)
+- An [`asobi_arena_lua`](https://github.com/widgrensit/asobi_arena_lua) backend running locally (see Backend Setup)
 
 ## Backend Setup
 
-1. Configure the arena game mode in your asobi `sys.config`:
+This demo plays the full arena game (boons, modifiers, voting, bots), so it needs the `asobi_arena_lua` backend, not the minimal [`sdk_demo_backend`](https://github.com/widgrensit/sdk_demo_backend).
 
-```erlang
-{asobi, [
-    {game_modes, #{
-        <<"arena">> => asobi_arena
-    }}
-]}
+```bash
+git clone https://github.com/widgrensit/asobi_arena_lua
+cd asobi_arena_lua && docker compose up -d
 ```
 
-2. Start the backend:
-
-```sh
-cd /path/to/asobi
-docker compose up -d
-rebar3 shell
-```
+The server listens on `http://localhost:8085`, the host and port the client connects to in `Assets/Scripts/Shared/GameConfig.cs`. On Windows and macOS this needs Docker Desktop running; on Windows use the WSL2 backend.
 
 ## Unity Setup
 
