@@ -7,18 +7,18 @@ Players match up, spawn into an arena, move with WASD, aim with mouse, and shoot
 ## Prerequisites
 
 - Unity 2021.3+ (LTS recommended)
-- An [`asobi_arena_lua`](https://github.com/widgrensit/asobi_arena_lua) backend running locally (see Backend Setup)
+- The [asobi CLI](https://github.com/widgrensit/asobi-cli) and Docker (for `asobi dev`)
 
 ## Backend Setup
 
-This demo plays the full arena game (boons, modifiers, voting, bots), so it needs the `asobi_arena_lua` backend, not the minimal [`sdk_demo_backend`](https://github.com/widgrensit/sdk_demo_backend).
+The full arena game logic (boons, modifiers, voting, bots) is bundled in `lua/`.
+Run it locally with one command:
 
 ```bash
-git clone https://github.com/widgrensit/asobi_arena_lua
-cd asobi_arena_lua && docker compose up -d
+asobi dev
 ```
 
-The server listens on `http://localhost:8085`, the host and port the client connects to in `Assets/Scripts/Shared/GameConfig.cs`. On Windows and macOS this needs Docker Desktop running; on Windows use the WSL2 backend.
+The server listens on `http://localhost:8084` - the host and port the client connects to in `Assets/Scripts/Shared/GameConfig.cs`. On Windows and macOS this needs Docker Desktop running; on Windows use the WSL2 backend. Leave it running.
 
 ## Unity Setup
 
