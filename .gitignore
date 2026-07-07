@@ -27,3 +27,6 @@
 erl_crash.dump
 CLAUDE.md
 .tool-versions
+
+# asobi dev local backend
+.asobi/

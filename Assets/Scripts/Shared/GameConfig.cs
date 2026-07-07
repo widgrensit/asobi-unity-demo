@@ -6,7 +6,7 @@ namespace AsobiDemo
     public static class GameConfig
     {
         public const string Host = "localhost";
-        public const int Port = 8085;
+        public const int Port = 8084;
         public const string GameMode = "arena";
         public const string LeaderboardId = "arena_kills";
 
