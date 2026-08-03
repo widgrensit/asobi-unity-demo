@@ -2,7 +2,7 @@
 
 A multiplayer top-down arena shooter demo built with [Asobi](https://github.com/widgrensit/asobi) game backend and the [Asobi Unity SDK](https://github.com/widgrensit/asobi-unity).
 
-Players match up, spawn into an arena, move with WASD, aim with mouse, and shoot with left click. 90-second rounds, most kills wins. Scores submit to a global leaderboard.
+Players match up, spawn into an arena, move with WASD, aim with mouse, and shoot with left click. Best of 3 rounds, 90 seconds each, with a boon pick and a modifier vote in between. Kills accumulate across the match and are submitted to a global leaderboard.
 
 ## Prerequisites
 
@@ -11,7 +11,8 @@ Players match up, spawn into an arena, move with WASD, aim with mouse, and shoot
 
 ## Backend Setup
 
-The full arena game logic (boons, modifiers, voting, bots) is bundled in `lua/`.
+The full arena game logic (boons, modifiers, voting, bots) is bundled in `lua/`,
+kept in sync with [asobi_arena_lua](https://github.com/widgrensit/asobi_arena_lua).
 Run it locally with one command:
 
 ```bash
@@ -24,25 +25,26 @@ The server listens on `http://localhost:8084` - the host and port the client con
 
 1. Open this project in Unity
 2. The SDK is pulled automatically via Package Manager (see `Packages/manifest.json`)
-3. Create 4 scenes in `Assets/Scenes/`:
+3. Hit Play
 
-| Scene | Setup |
-|-------|-------|
-| **Login** | Create empty GameObject, add `LoginBootstrap` component |
-| **Lobby** | Create empty GameObject, add `LobbyBootstrap` component |
-| **Arena** | Create empty GameObject, add `ArenaBootstrap` component |
-| **Results** | Create empty GameObject, add `ResultsBootstrap` component |
+The four scenes (`Login`, `Lobby`, `Arena`, `Results`) are committed under
+`Assets/Scenes/` and already registered in Build Settings with **Login** at
+index 0. Each is a single empty GameObject carrying its `*Bootstrap`
+component - all UI is built programmatically at runtime.
 
-4. Add all 4 scenes to Build Settings (File > Build Settings > Add Open Scenes)
-5. Make sure **Login** is the first scene (index 0)
-6. Hit Play
+### SDK version
+
+`Packages/manifest.json` pins the SDK to a tag
+(`asobi-unity.git#v0.13.1`) so the demo builds reproducibly. To move to a
+newer SDK, bump the tag in `manifest.json` and the matching
+`version`/`hash` in `Packages/packages-lock.json`.
 
 ## Controls
 
 - **WASD** - Move
 - **Mouse** - Aim
 - **Left Click** - Shoot
-- Match lasts 90 seconds, most kills wins
+- Best of 3 rounds, 90 seconds each; most cumulative kills wins
 
 ## Architecture
 
@@ -57,4 +59,13 @@ Login → Lobby → [Matchmaker] → Arena → Results → Lobby
 - **Arena**: Real-time game state sync at 10 ticks/sec via WebSocket
 - **Results**: Show standings, submit kills to leaderboard
 
-All UI is created programmatically by the Bootstrap scripts — no prefabs or scene setup needed beyond adding a single component to an empty GameObject.
+## Tests
+
+The parsing layer is covered by a licence-free .NET test project so CI can
+run it without a Unity seat:
+
+```bash
+dotnet test Tests/AsobiDemo.NET/AsobiDemo.Tests.csproj
+```
+
+See `Tests/AsobiDemo.NET/README.md`.

@@ -1,11 +1,11 @@
 {
   "dependencies": {
     "com.asobi.sdk": {
-      "version": "https://github.com/widgrensit/asobi-unity.git",
+      "version": "https://github.com/widgrensit/asobi-unity.git#v0.13.1",
       "depth": 0,
       "source": "git",
       "dependencies": {},
-      "hash": "d0149003ffa76811b3c0d8f829224e9581bceab4"
+      "hash": "aa776d1ef681790ec3fdb32a2d1324b26a748665"
     },
     "com.unity.2d.sprite": {
       "version": "1.0.0",

@@ -1,11 +1,15 @@
 -- Arena shooter match logic
--- Implements all asobi_match callbacks in Lua
+-- Implements all asobi_match callbacks in Lua.
+-- A match is a best-of session: several rounds played in one match, with a boon
+-- pick and a modifier vote between rounds. Kills accumulate across rounds and
+-- are submitted to a persistent leaderboard when the match ends.
 
 -- Game mode config (read by asobi at startup)
 match_size = 4
 max_players = 10
 strategy = "fill"
 bots = { script = "bots/arena_bot.lua" }
+tick_rate = 100
 
 local boons = require("boons")
 local modifiers = require("modifiers")
@@ -18,6 +22,8 @@ local TICK_MS = 100
 local PLAYER_RADIUS = 16
 local BOON_PICK_TIMEOUT = 15000
 local TOP_N = 3
+local TOTAL_ROUNDS = 3
+local LEADERBOARD = "arena_kills"
 
 -- Helpers
 
@@ -33,12 +39,6 @@ local function distance(x1, y1, x2, y2)
     return math.sqrt(dx * dx + dy * dy)
 end
 
-local function now_ms()
-    -- Luerl doesn't expose os.clock in ms, so we track time via tick counting
-    -- Each tick is 100ms; we'll use a counter-based approach
-    return nil
-end
-
 local function count_keys(t)
     local n = 0
     for _ in pairs(t) do n = n + 1 end
@@ -47,12 +47,6 @@ end
 
 local function is_bot(id)
     return type(id) == "string" and string.sub(id, 1, 4) == "bot_"
-end
-
-local function shallow_copy(t)
-    local out = {}
-    for k, v in pairs(t) do out[k] = v end
-    return out
 end
 
 local function copy_list(t)
@@ -85,12 +79,55 @@ local function effective_cooldown(stats, mod_config)
     return math.floor(base * mult + 0.5)
 end
 
--- Build standings from players (sorted by kills descending)
+-- Spawn (or respawn for a new round) one player entity from their session stats
+-- and the current modifier config.
 
-local function build_standings(players)
+local function spawn_player(pid, state)
+    local stats = state.session_stats[pid] or boons.default_stats()
+    local mod_config = state.mod_config or {}
+    local max_hp = effective_hp(stats, mod_config)
+    local w = state.arena_w
+    local h = state.arena_h
+
+    state.players[pid] = {
+        x = math.random(w - 100) + 50,
+        y = math.random(h - 100) + 50,
+        hp = max_hp,
+        max_hp = max_hp,
+        kills = 0,
+        deaths = 0,
+        shoot_cd = 0,
+        speed = stats.speed,
+        damage = effective_damage(stats, mod_config),
+        projectile_speed = effective_proj_speed(stats, mod_config),
+        projectile_radius = stats.projectile_radius,
+        shoot_cooldown = effective_cooldown(stats, mod_config),
+        lifesteal = stats.lifesteal or 0,
+        lives = mod_config.lives or 0,
+        boons = copy_list(stats.boons or {})
+    }
+end
+
+-- Fold this round's kills/deaths into the session totals.
+
+local function accumulate_round(state)
+    for pid, p in pairs(state.players) do
+        state.session_kills[pid] = (state.session_kills[pid] or 0) + (p.kills or 0)
+        state.session_deaths[pid] = (state.session_deaths[pid] or 0) + (p.deaths or 0)
+    end
+    return state
+end
+
+-- Standings by cumulative session kills (descending).
+
+local function build_session_standings(state)
     local list = {}
-    for id, p in pairs(players) do
-        table.insert(list, { player_id = id, kills = p.kills or 0, deaths = p.deaths or 0 })
+    for pid, kills in pairs(state.session_kills) do
+        table.insert(list, {
+            player_id = pid,
+            kills = kills,
+            deaths = state.session_deaths[pid] or 0
+        })
     end
     table.sort(list, function(a, b) return a.kills > b.kills end)
     for i, s in ipairs(list) do
@@ -122,10 +159,10 @@ local function generate_boon_offers(top_ids, session_stats)
     return offers
 end
 
--- Build result for match finish
+-- Result payload sent to every client when the match ends.
 
-local function build_result(state)
-    local standings = build_standings(state.players)
+local function build_result(state, standings)
+    standings = standings or build_session_standings(state)
     local winner = nil
     if #standings > 0 then
         winner = standings[1].player_id
@@ -133,10 +170,20 @@ local function build_result(state)
     return {
         status = "completed",
         standings = standings,
-        round = state.round,
+        rounds = state.round,
         session_stats = state.session_stats,
         winner = winner
     }
+end
+
+-- Submit each human player's total kills to the persistent leaderboard.
+
+local function submit_leaderboard(state)
+    for pid, kills in pairs(state.session_kills) do
+        if not is_bot(pid) then
+            game.leaderboard.submit(LEADERBOARD, pid, kills)
+        end
+    end
 end
 
 -- Auto-pick boons for players who haven't picked
@@ -153,6 +200,51 @@ local function auto_pick_remaining(state)
     return state
 end
 
+-- Start a fresh round: respawn everyone with their current stats and modifier,
+-- clear the field, and reset the round timer.
+
+local function start_round(state)
+    state.projectiles = {}
+    state.next_proj_id = 1
+    state.round_start_tick = state.tick_count
+    state.boon_offers = {}
+    state.boon_picks = {}
+    state.phase = "playing"
+    for pid, _ in pairs(state.players) do
+        spawn_player(pid, state)
+    end
+    return state
+end
+
+-- End the current round: bank kills, and either finish the match after the last
+-- round or open the between-rounds boon pick / modifier vote.
+
+local function end_round(state)
+    state = accumulate_round(state)
+    local standings = build_session_standings(state)
+    state.standings = standings
+
+    if state.round >= state.total_rounds then
+        submit_leaderboard(state)
+        state.phase = "finished"
+        state._finished = true
+        state._result = build_result(state, standings)
+        return state
+    end
+
+    local top_ids = top_player_ids(standings, TOP_N)
+    local offers = generate_boon_offers(top_ids, state.session_stats)
+    if count_keys(offers) == 0 then
+        state.phase = "vote_pending"
+    else
+        state.phase = "boon_pick"
+        state.boon_offers = offers
+        state.boon_picks = {}
+        state.boon_pick_deadline = state.tick_count + (BOON_PICK_TIMEOUT / TICK_MS)
+    end
+    return state
+end
+
 -- Callbacks
 
 function init(config)
@@ -164,11 +256,15 @@ function init(config)
         projectiles = {},
         next_proj_id = 1,
         tick_count = 0,
+        round_start_tick = 0,
         phase = "playing",
         modifier = modifier,
         mod_config = mod_config,
-        session_stats = config.session_stats or {},
-        round = config.round or 1,
+        session_stats = {},
+        session_kills = {},
+        session_deaths = {},
+        round = 1,
+        total_rounds = TOTAL_ROUNDS,
         boon_offers = {},
         boon_picks = {},
         boon_pick_deadline = 0,
@@ -179,30 +275,10 @@ function init(config)
 end
 
 function join(player_id, state)
-    local stats = state.session_stats[player_id] or boons.default_stats()
-    local mod_config = state.mod_config or {}
-    local max_hp = effective_hp(stats, mod_config)
-    local w = state.arena_w
-    local h = state.arena_h
-
-    state.players[player_id] = {
-        x = math.random(w - 100) + 50,
-        y = math.random(h - 100) + 50,
-        hp = max_hp,
-        max_hp = max_hp,
-        kills = 0,
-        deaths = 0,
-        shoot_cd = 0,
-        speed = stats.speed,
-        damage = effective_damage(stats, mod_config),
-        projectile_speed = effective_proj_speed(stats, mod_config),
-        projectile_radius = stats.projectile_radius,
-        shoot_cooldown = effective_cooldown(stats, mod_config),
-        lifesteal = stats.lifesteal or 0,
-        lives = mod_config.lives or 0,
-        boons = copy_list(stats.boons or {})
-    }
-
+    state.session_stats[player_id] = state.session_stats[player_id] or boons.default_stats()
+    state.session_kills[player_id] = state.session_kills[player_id] or 0
+    state.session_deaths[player_id] = state.session_deaths[player_id] or 0
+    spawn_player(player_id, state)
     return state
 end
 
@@ -296,13 +372,23 @@ end
 function tick(state)
     state.tick_count = state.tick_count + 1
 
-    -- Boon pick phase: check deadline
+    -- A vote was requested the moment we entered vote_pending; flip to voting so
+    -- vote_requested does not fire it again on the next tick. Wait here until
+    -- vote_resolved starts the next round.
+    if state.phase == "vote_pending" then
+        state.phase = "voting"
+        return state
+    end
+    if state.phase == "voting" then
+        return state
+    end
+
+    -- Boon pick phase: check deadline, then open the modifier vote.
     if state.phase == "boon_pick" then
         local ticks_since_deadline = state.tick_count - state.boon_pick_deadline
         if ticks_since_deadline >= 0 then
             state = auto_pick_remaining(state)
-            state._finished = true
-            state._result = build_result(state)
+            state.phase = "vote_pending"
             return state
         end
 
@@ -319,8 +405,7 @@ function tick(state)
 
         if all_done and (has_human_pick or count_keys(state.boon_picks) > 0) then
             state = auto_pick_remaining(state)
-            state._finished = true
-            state._result = build_result(state)
+            state.phase = "vote_pending"
             return state
         end
 
@@ -405,8 +490,8 @@ function tick(state)
         end
     end
 
-    -- Check finish condition
-    local elapsed = state.tick_count * TICK_MS
+    -- Check round finish condition
+    local elapsed = (state.tick_count - state.round_start_tick) * TICK_MS
     local num_players = count_keys(state.players)
     local num_alive = 0
     for _, p in pairs(state.players) do
@@ -423,19 +508,7 @@ function tick(state)
     end
 
     if finished then
-        local standings = build_standings(state.players)
-        state.standings = standings
-        local top_ids = top_player_ids(standings, TOP_N)
-        local offers = generate_boon_offers(top_ids, state.session_stats)
-
-        if count_keys(offers) == 0 then
-            state.phase = "vote_pending"
-        else
-            state.phase = "boon_pick"
-            state.boon_offers = offers
-            state.boon_picks = {}
-            state.boon_pick_deadline = state.tick_count + (BOON_PICK_TIMEOUT / TICK_MS)
-        end
+        state = end_round(state)
     end
 
     return state
@@ -455,6 +528,8 @@ function get_state(player_id, state)
         local remaining = (state.boon_pick_deadline - state.tick_count) * TICK_MS
         return {
             phase = "boon_pick",
+            round = state.round,
+            total_rounds = state.total_rounds,
             standings = state.standings,
             boon_offers = offer_list,
             picks_done = picks_done,
@@ -462,9 +537,11 @@ function get_state(player_id, state)
         }
     end
 
-    if state.phase == "voting" then
+    if state.phase == "vote_pending" or state.phase == "voting" then
         return {
             phase = "voting",
+            round = state.round,
+            total_rounds = state.total_rounds,
             standings = state.standings,
             current_modifier = state.modifier
         }
@@ -494,7 +571,7 @@ function get_state(player_id, state)
         })
     end
 
-    local elapsed = state.tick_count * TICK_MS
+    local elapsed = (state.tick_count - state.round_start_tick) * TICK_MS
     local my_boons = {}
     local me = state.players[player_id]
     if me then
@@ -510,6 +587,7 @@ function get_state(player_id, state)
         arena_h = state.arena_h,
         modifier = state.modifier,
         round = state.round,
+        total_rounds = state.total_rounds,
         my_boons = my_boons
     }
 end
@@ -529,18 +607,17 @@ end
 
 function vote_resolved(template, result, state)
     if template == "arena_modifier" then
-        -- Ensure all players have session stats
         for pid, _ in pairs(state.players) do
             if not state.session_stats[pid] then
                 state.session_stats[pid] = boons.default_stats()
             end
         end
-        state.phase = "finished"
         state.round = state.round + 1
-        state.next_modifier = result.winner
-
-        state._finished = true
-        state._result = build_result(state)
+        state.modifier = result.winner
+        state.mod_config = modifiers.apply(result.winner)
+        state.arena_w = state.mod_config.arena_w or ARENA_W
+        state.arena_h = state.mod_config.arena_h or ARENA_H
+        state = start_round(state)
     end
     return state
 end

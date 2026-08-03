@@ -1,0 +1,31 @@
+name: Tests
+
+on:
+  pull_request:
+    paths-ignore: ['**.md', 'docs/**', 'LICENSE']
+  push:
+    paths-ignore: ['**.md', 'docs/**', 'LICENSE']
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  wire:
+    name: Wire contract (.NET, no Unity license)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore
+        run: dotnet restore Tests/AsobiDemo.NET/AsobiDemo.Tests.csproj
+
+      - name: Test
+        run: dotnet test Tests/AsobiDemo.NET/AsobiDemo.Tests.csproj --no-restore --logger "console;verbosity=normal"
