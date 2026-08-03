@@ -57,7 +57,7 @@ namespace AsobiDemo
 
             var client = GameConfig.Client;
             client.Realtime.OnMatchState += OnMatchState;
-            client.Realtime.OnMatchEvent += OnMatchEvent;
+            client.Realtime.OnMatchFinished += OnMatchFinished;
             client.Realtime.OnVoteStart += OnVoteStart;
             client.Realtime.OnVoteTally += OnVoteTally;
             client.Realtime.OnVoteResult += OnVoteResult;
@@ -71,29 +71,16 @@ namespace AsobiDemo
                 _latestState = state;
         }
 
-        void OnMatchEvent(string eventName, string rawJson)
+        void OnMatchFinished(string rawJson)
         {
-            if (eventName == "finished")
+            var result = ArenaMatchResult.Parse(ExtractPayload(rawJson));
+            _matchEnded = true;
+            UnityMainThread.Enqueue(() =>
             {
-                var payload = ExtractPayload(rawJson);
-                var result = JsonUtility.FromJson<ArenaMatchResult>(payload);
-                if (result != null)
-                {
-                    _matchEnded = true;
-                    UnityMainThread.Enqueue(() =>
-                    {
-                        MatchResult.Winner = result.winner;
-                        MatchResult.Standings = result.standings ?? new();
-                        // Show results for 3s then auto-queue
-                        Invoke(nameof(AutoQueue), 3f);
-                    });
-                }
-            }
-        }
-
-        void AutoQueue()
-        {
-            SceneLoader.LoadLobby();
+                MatchResult.Winner = result.winner;
+                MatchResult.Standings = result.standings;
+                SceneLoader.LoadResults();
+            });
         }
 
         void OnVoteStart(string rawJson)
@@ -368,28 +355,13 @@ namespace AsobiDemo
                 _boonPickUI.UpdateTimer(state.time_remaining);
         }
 
-        string ExtractPayload(string rawJson)
-        {
-            var idx = rawJson.IndexOf("\"payload\":");
-            if (idx < 0) return rawJson;
-            var start = rawJson.IndexOf('{', idx);
-            if (start < 0) return rawJson;
-
-            int depth = 0;
-            for (int i = start; i < rawJson.Length; i++)
-            {
-                if (rawJson[i] == '{') depth++;
-                else if (rawJson[i] == '}') depth--;
-                if (depth == 0) return rawJson.Substring(start, i - start + 1);
-            }
-            return rawJson;
-        }
+        string ExtractPayload(string rawJson) => ArenaState.ExtractObject(rawJson, "payload") ?? rawJson;
 
         void OnDestroy()
         {
             var client = GameConfig.Client;
             client.Realtime.OnMatchState -= OnMatchState;
-            client.Realtime.OnMatchEvent -= OnMatchEvent;
+            client.Realtime.OnMatchFinished -= OnMatchFinished;
             client.Realtime.OnVoteStart -= OnVoteStart;
             client.Realtime.OnVoteTally -= OnVoteTally;
             client.Realtime.OnVoteResult -= OnVoteResult;

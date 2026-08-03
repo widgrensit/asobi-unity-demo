@@ -26,15 +26,14 @@ namespace AsobiDemo
                 players = new Dictionary<string, ArenaPlayer>(),
                 projectiles = new List<ArenaProjectile>(),
                 boon_offers = new List<BoonOffer>(),
-                my_boons = new List<string>(),
-                standings = new List<StandingEntry>()
+                my_boons = new List<string>()
             };
 
             state.time_remaining = ParseFloat(json, "time_remaining");
             state.phase = ParseString(json, "phase");
             state.round = ParseInt(json, "round");
             state.modifier = ParseString(json, "modifier");
-            state.picks_done = ParseInt(json, "picks_done");
+            state.picks_done = ParsePicksDone(json);
 
             // Parse players
             var playersBlock = ExtractBlock(json, "players");
@@ -126,34 +125,48 @@ namespace AsobiDemo
                     state.my_boons.Add(m.Groups[1].Value);
             }
 
-            // Parse standings
-            var standingsBlock = ExtractArray(json, "standings");
-            if (standingsBlock != null)
-            {
-                int pos = 0;
-                while (pos < standingsBlock.Length)
-                {
-                    var braceStart = standingsBlock.IndexOf('{', pos);
-                    if (braceStart < 0) break;
-                    var braceEnd = FindMatchingBrace(standingsBlock, braceStart);
-                    if (braceEnd < 0) break;
-
-                    var sJson = standingsBlock.Substring(braceStart, braceEnd - braceStart + 1);
-                    state.standings.Add(new StandingEntry
-                    {
-                        player_id = ParseString(sJson, "player_id"),
-                        kills = ParseInt(sJson, "kills"),
-                        deaths = ParseInt(sJson, "deaths"),
-                        rank = ParseInt(sJson, "rank")
-                    });
-                    pos = braceEnd + 1;
-                }
-            }
+            state.standings = ParseStandings(json);
 
             return state;
         }
 
-        static string ExtractBlock(string json, string key)
+        public static List<StandingEntry> ParseStandings(string json)
+        {
+            var standings = new List<StandingEntry>();
+            var standingsBlock = ExtractArray(json, "standings");
+            if (standingsBlock == null) return standings;
+
+            int pos = 0;
+            while (pos < standingsBlock.Length)
+            {
+                var braceStart = standingsBlock.IndexOf('{', pos);
+                if (braceStart < 0) break;
+                var braceEnd = FindMatchingBrace(standingsBlock, braceStart);
+                if (braceEnd < 0) break;
+
+                var sJson = standingsBlock.Substring(braceStart, braceEnd - braceStart + 1);
+                standings.Add(new StandingEntry
+                {
+                    player_id = ParseString(sJson, "player_id"),
+                    kills = ParseInt(sJson, "kills"),
+                    deaths = ParseInt(sJson, "deaths"),
+                    rank = ParseInt(sJson, "rank")
+                });
+                pos = braceEnd + 1;
+            }
+            return standings;
+        }
+
+        // The server sends picks_done as the list of players who have already
+        // picked; older builds sent a bare count.
+        static int ParsePicksDone(string json)
+        {
+            var block = ExtractArray(json, "picks_done");
+            if (block == null) return ParseInt(json, "picks_done");
+            return Regex.Matches(block, "\"([^\"]+)\"").Count;
+        }
+
+        public static string ExtractObject(string json, string key)
         {
             var pattern = "\"" + key + "\"\\s*:\\s*\\{";
             var match = Regex.Match(json, pattern);
@@ -161,7 +174,13 @@ namespace AsobiDemo
             var start = json.IndexOf('{', match.Index + match.Length - 1);
             var end = FindMatchingBrace(json, start);
             if (end < 0) return null;
-            return json.Substring(start + 1, end - start - 1);
+            return json.Substring(start, end - start + 1);
+        }
+
+        static string ExtractBlock(string json, string key)
+        {
+            var obj = ExtractObject(json, key);
+            return obj == null ? null : obj.Substring(1, obj.Length - 2);
         }
 
         static string ExtractArray(string json, string key)
@@ -247,7 +266,20 @@ namespace AsobiDemo
     {
         public string status;
         public string winner;
-        public List<MatchResult.PlayerStanding> standings;
+        public List<StandingEntry> standings;
+
+        // The server wraps the game's result table: match.finished carries
+        // {match_id, result}, so the arena fields live one level down.
+        public static ArenaMatchResult Parse(string payload)
+        {
+            var json = ArenaState.ExtractObject(payload, "result") ?? payload;
+            return new ArenaMatchResult
+            {
+                status = ArenaState.ParseString(json, "status"),
+                winner = ArenaState.ParseString(json, "winner"),
+                standings = ArenaState.ParseStandings(json)
+            };
+        }
     }
 
     [Serializable]
